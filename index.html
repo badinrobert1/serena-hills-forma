@@ -274,7 +274,7 @@ const T = {
     call:"Զանգ", optional:"(ոչ պարտադիր)",
     comment:"Մեկնաբանություն", send:"Ուղարկել հայտը", sending:"Ուղարկվում է…",
     note:"Սեղմելով կոճակը՝ համաձայնում եք, որ մենք կապվենք Ձեզ հետ։",
-    errName:"Գրեք Ձեր անունը", errPhone:"Ստուգեք համարը. օրինակ՝ +374 91 123456", errMethod:"Ընտրեք կապի եղանակը",
+    errName:"Գրեք Ձեր անունը", errPhone:"Գրեք Ձեր հեռախոսահամարը", errMethod:"Ընտրեք կապի եղանակը",
     fail:"Հայտը չուղարկվեց։ Ստուգեք ինտերնետը և փորձեք կրկին։",
     thanks:"Շնորհակալություն, հայտն ուղարկված է", soon:"Մենք շուտով կկապվենք Ձեզ հետ։"
   },
@@ -285,7 +285,7 @@ const T = {
     call:"Звонок", optional:"(необязательно)",
     comment:"Комментарий", send:"Отправить заявку", sending:"Отправляем…",
     note:"Нажимая кнопку, вы соглашаетесь, чтобы мы с вами связались.",
-    errName:"Напишите ваше имя", errPhone:"Проверьте номер, например +374 91 123456", errMethod:"Выберите способ связи",
+    errName:"Напишите ваше имя", errPhone:"Напишите номер телефона", errMethod:"Выберите способ связи",
     fail:"Заявка не отправилась. Проверьте интернет и попробуйте ещё раз.",
     thanks:"Спасибо, заявка отправлена", soon:"Мы скоро с вами свяжемся."
   }
@@ -311,9 +311,16 @@ $("#form").addEventListener("submit", async e => {
   const name = $("#name").value.trim();
   const phone = $("#phone").value.trim();
   const method = document.querySelector("[name=method]:checked")?.value;
-  const d = digits(phone);
+  // Приводим номер к виду 374XXXXXXXX: принимаем 091 123456, 91 123456, +374 091 123456 и т.п.
+  let d = digits(phone);
+  if (d.length===9 && d[0]==="0") d = "374" + d.slice(1);
+  else if (d.length===8) d = "374" + d;
+  else if (d.length===12 && d.startsWith("3740")) d = "374" + d.slice(4);
+  const phoneNice = d.startsWith("374") && d.length===11
+    ? "+374 " + d.slice(3,5) + " " + d.slice(5,8) + " " + d.slice(8)
+    : phone;   // номер любого вида отправляется как есть
 
-  const checks = [["#f-name", name.length>=2], ["#f-phone", d.length>=10 && d.length<=15], ["#f-method", !!method]];
+  const checks = [["#f-name", name.length>=1], ["#f-phone", phone.replace(/^\s*\+?\s*374\s*/,"").trim().length>0], ["#f-method", !!method]];
   checks.forEach(([id,ok]) => $(id).classList.toggle("invalid", !ok));
   const bad = checks.find(([,ok]) => !ok);
   if (bad){ $(bad[0]).querySelector("input")?.focus(); return; }
@@ -327,10 +334,11 @@ $("#form").addEventListener("submit", async e => {
       method:"POST",
       headers:{"Content-Type":"application/json", "Accept":"application/json"},
       body: JSON.stringify({
-        _subject: "Новая заявка Serena Hills: " + name + " (" + methodRu + ")",
+        _subject: "Новая заявка Serena Hills: " + name + ", " + phoneNice + " (" + methodRu + ")",
         _template: "table",
         "Имя": name,
-        "Телефон": phone,
+        "Телефон": phoneNice,
+        "Как ввёл клиент": phone,
         "Как связаться": methodRu,
         "Комментарий": $("#comment").value.trim() || "—",
         "Написать в WhatsApp": "https://wa.me/" + d,
